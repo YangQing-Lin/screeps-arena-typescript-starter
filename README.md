@@ -11,7 +11,6 @@
 winget install Schniz.fnm
 
 # configure fnm environment
-# 之后每次关闭终端都需要重新执行这一行
 fnm env --use-on-cd | Out-String | Invoke-Expression
 
 # download and install Node.js
@@ -22,6 +21,14 @@ node -v # should print `v20.18.0`
 
 # verifies the right npm version is in the environment
 npm -v # should print `10.8.2`
+```
+
+启动 node 环境（每次重新打开终端都需要执行）：
+
+```bash
+fnm env --use-on-cd | Out-String | Invoke-Expression
+fnm list
+fnm use v20.18.0
 ```
 
 切换 npm 源：
