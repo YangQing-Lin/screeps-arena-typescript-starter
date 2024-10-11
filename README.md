@@ -53,7 +53,10 @@ yarn
 将 TS 文件编译为 JS
 
 ```bash
+# 手动编译
 npm run build
+
+# 自动编译
 ```
 
 安装 yarn 遇到报错：
