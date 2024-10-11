@@ -61,9 +61,8 @@ if (spawn.id == '4') {
 }
 
 
-
+// 通过给定的起始对象和终点对象，返回从起始点到终点路径的三分之一处
 export function getOneThirdPosition(fromPos: StructureSpawn, toPos: StructureSpawn) {
-    // 通过给定的起始对象和终点对象，返回从起始点到终点路径的三分之一处
     let path = findPath(fromPos, toPos);
     if (path.length < 3) {
         return { x: fromPos.x, y: fromPos.y };
@@ -71,6 +70,7 @@ export function getOneThirdPosition(fromPos: StructureSpawn, toPos: StructureSpa
     return path[Math.round(path.length / 3)];
 }
 
+// 获取还活着的爬虫
 export function getAliveCreep(creeps: Creep[]) {
     let alive_creeps = [];
     for (let creep of creeps) {
@@ -81,6 +81,7 @@ export function getAliveCreep(creeps: Creep[]) {
     return alive_creeps;
 }
 
+// 获取已经死亡的爬虫
 export function getDeadCreep(creeps: Creep[]) {
     let dead_creeps = [];
     for (let creep of creeps) {
