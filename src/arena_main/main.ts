@@ -24,6 +24,7 @@ import {
   TOUGH,
   WORK,
 } from "game/constants";
+import { CLIENT_RENEG_LIMIT } from "tls";
 // import {} from "arena";
 
 let max_farmer = 3; // 农民数量
@@ -48,6 +49,19 @@ let spawn = getObjectsByPrototype(StructureSpawn).find((i) => i.my)!;
 let enemySpawn = getObjectsByPrototype(StructureSpawn).find((i) => !i.my)!;
 // 计算屯兵位置
 let creepStopPosition = getOneThirdPosition(spawn, enemySpawn);
+// 保存最近的三个能量容器
+let myContainers: StructureContainer[] = [];
+let enemyContainers: StructureContainer[] = [];
+if (spawn.id == '4') {
+    // 强制类型转换：<GameObject> -> <StructureContainer>
+    myContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id < '5');
+    enemyContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id > '5');
+} else {
+    myContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id > '5');
+    enemyContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id < '5');
+}
+
+
 
 export function getOneThirdPosition(fromPos: StructureSpawn, toPos: StructureSpawn) {
     // 通过给定的起始对象和终点对象，返回从起始点到终点路径的三分之一处
@@ -201,22 +215,11 @@ export function statusDefault(enemys: Creep[], dead_my: Creep[], alive_my: Creep
 
 }
 
-
-
 export function loop(): void {
   // Your code goes here
   console.log("当前Tick:", getTicks());
   console.log("屯兵位置：", creepStopPosition);
 
-  let containers: StructureContainer[] = [];
-  for (let i = 1; i <= 3; i++) {
-      if (Number(spawn.id) == 5) {
-        // 强制类型转换：<GameObject> -> <StructureContainer>
-        containers.push(<StructureContainer>getObjectById((Number(spawn.id) + i).toString()));
-      } else {
-        containers.push(<StructureContainer>getObjectById((Number(spawn.id) - i).toString()));
-      }
-  }
   console.log("my spawn id:", spawn.id);
   console.log("enemy spawn:", enemySpawn);
 
@@ -224,7 +227,7 @@ export function loop(): void {
   createCreeps()
 
   // 搬运能量
-  carryEnergy(containers)
+  carryEnergy(myContainers)
 
   // 获取敌人信息
   let enemys = getObjectsByPrototype(Creep).filter((i) => !i.my);

@@ -208,23 +208,22 @@ export function loop(): void {
   console.log("当前Tick:", getTicks());
   console.log("屯兵位置：", creepStopPosition);
 
-  let containers: StructureContainer[] = [];
-  for (let i = 1; i <= 3; i++) {
-      if (Number(spawn.id) == 5) {
-        // 强制类型转换：<GameObject> -> <StructureContainer>
-        containers.push(<StructureContainer>getObjectById((Number(spawn.id) + i).toString()));
-      } else {
-        containers.push(<StructureContainer>getObjectById((Number(spawn.id) - i).toString()));
-      }
+  let myContainers: StructureContainer[] = [];
+  let enemyContainers: StructureContainer[] = [];
+  if (Number(spawn.id) == 5) {
+      // 强制类型转换：<GameObject> -> <StructureContainer>
+      myContainers = getObjectsByPrototype(StructureContainer).filter((i) => Number(i.id) < 5);
+      enemyContainers = getObjectsByPrototype(StructureContainer).filter((i) => Number(i.id) > 5);
+  } else {
+      myContainers = getObjectsByPrototype(StructureContainer).filter((i) => Number(i.id) > 5);
+      enemyContainers = getObjectsByPrototype(StructureContainer).filter((i) => Number(i.id) < 5);
   }
-  console.log("my spawn id:", spawn.id);
-  console.log("enemy spawn:", enemySpawn);
 
   // 创建爬虫
   createCreeps()
 
   // 搬运能量
-  carryEnergy(containers)
+  carryEnergy(myContainers)
 
   // 获取敌人信息
   let enemys = getObjectsByPrototype(Creep).filter((i) => !i.my);
