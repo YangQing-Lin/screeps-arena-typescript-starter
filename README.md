@@ -29,6 +29,7 @@ npm -v # should print `10.8.2`
 fnm env --use-on-cd | Out-String | Invoke-Expression
 fnm list
 fnm use v20.18.0
+npm run watch
 ```
 
 切换 npm 源：
@@ -57,6 +58,7 @@ yarn
 npm run build
 
 # 自动编译
+npm run watch
 ```
 
 安装 yarn 遇到报错：
