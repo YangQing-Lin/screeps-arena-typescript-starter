@@ -8,6 +8,8 @@ import {
 } from "game/utils";
 import {
   Creep,
+  GameObject,
+  GameObjectConstructor,
   Source,
   StructureContainer,
   StructureSpawn,
@@ -206,12 +208,13 @@ export function loop(): void {
   console.log("当前Tick:", getTicks());
   console.log("屯兵位置：", creepStopPosition);
 
-  let containers = [];
+  let containers: StructureContainer[] = [];
   for (let i = 1; i <= 3; i++) {
-      if (spawn.id == 5) {
-          containers.push(getObjectById((Number(spawn.id) + i).toString()));
+      if (Number(spawn.id) == 5) {
+        // 强制类型转换：<GameObject> -> <StructureContainer>
+        containers.push(<StructureContainer>getObjectById((Number(spawn.id) + i).toString()));
       } else {
-          containers.push(getObjectById((Number(spawn.id) - i).toString()));
+        containers.push(<StructureContainer>getObjectById((Number(spawn.id) - i).toString()));
       }
   }
   console.log("my spawn id:", spawn.id);
