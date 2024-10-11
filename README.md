@@ -11,6 +11,7 @@
 winget install Schniz.fnm
 
 # configure fnm environment
+# 之后每次关闭终端都需要重新执行这一行
 fnm env --use-on-cd | Out-String | Invoke-Expression
 
 # download and install Node.js
@@ -30,12 +31,22 @@ npm -v # should print `10.8.2`
 执行安装：
 
 ```bash
+# 切换腾讯源
+npm config set registry http://mirrors.cloud.tencent.com/npm/
+npm config get registry
+
 # npm
 npm install
 
 # 或者使用 yarn
 npm install --global yarn
 yarn
+```
+
+将 TS 文件编译为 JS
+
+```bash
+npm run build
 ```
 
 安装 yarn 遇到报错：
