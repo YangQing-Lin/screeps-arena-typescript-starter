@@ -53,7 +53,6 @@ let creepStopPosition = getOneThirdPosition(spawn, enemySpawn);
 let myContainers: StructureContainer[] = [];
 let enemyContainers: StructureContainer[] = [];
 if (spawn.id == '4') {
-    // 强制类型转换：<GameObject> -> <StructureContainer>
     myContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id < '5');
     enemyContainers = getObjectsByPrototype(StructureContainer).filter((i) => i.id > '5');
 } else {
