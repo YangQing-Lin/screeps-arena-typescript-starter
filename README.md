@@ -28,7 +28,7 @@ npm -v # should print `10.8.2`
 ```bash
 fnm env --use-on-cd | Out-String | Invoke-Expression
 fnm list
-fnm use v20.18.0
+fnm use v20
 npm run watch
 ```
 
