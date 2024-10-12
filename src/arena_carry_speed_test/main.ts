@@ -18,7 +18,9 @@ import {
   ATTACK,
   CARRY,
   ERR_NOT_IN_RANGE,
+  HEAL,
   MOVE,
+  OK,
   RESOURCE_ENERGY,
   RIGHT,
   TOUGH,
@@ -37,7 +39,7 @@ let attacker_list: Creep[] = [];
 let range_attacker_list = [];
 let healer_list = [];
 
-let total_energy = 0;
+let total_energy = 0;  // 基地已经获取的能量总数
 
 const CreepStatus = {
     normal: "蹲草",
@@ -94,10 +96,16 @@ export function getDeadCreep(creeps: Creep[]) {
     return dead_creeps;
 }
 
+/**
+ * [CARRY, MOVE] * 5 = 22.5 的平均能量搬运速率
+ * [CARRY, MOVE, CARRY, MOVE] * 3 = 40
+ * [CARRY, MOVE, CARRY] * 3 = 34
+ */
+
 // 创建爬虫
 export function createCreeps() {
     if (farmer_list.length < max_farmer) {
-        let creep = spawn.spawnCreep([CARRY, MOVE]).object;
+        let creep = spawn.spawnCreep([CARRY, MOVE, CARRY]).object;
         if (creep) {
             farmer_list.push(creep);
         }
@@ -106,19 +114,14 @@ export function createCreeps() {
             MOVE,
             MOVE,
             MOVE,
-            MOVE,
-            MOVE,
-            MOVE,
-            MOVE,
-            MOVE,
-            ATTACK,
-            ATTACK,
-            ATTACK,
-            ATTACK,
-            MOVE,
+            HEAL,
+            HEAL,
+            HEAL,
         ]).object;
         if (creep) {
             attacker_list.push(creep);
+        } else {
+            console.log("spawn creep error: ");
         }
     }
 }
@@ -138,11 +141,26 @@ export function carryEnergy(containers: StructureContainer[]) {
                 creep.moveTo(container);
             }
         } else {
-            if (creep.transfer(spawn, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+            let transer_status = creep.transfer(spawn, RESOURCE_ENERGY)
+            if (transer_status == ERR_NOT_IN_RANGE) {
                 creep.moveTo(spawn);
+            } else if (transer_status == OK) {
+                total_energy += creep.store[RESOURCE_ENERGY];
+            } else {
+                console.log("transer status: " + transer_status);
             }
         }
     }
+}
+
+
+// 每个tick固定打印的信息
+export function printInfo() {
+    console.log("当前Tick:", getTicks());
+    console.log("资源总量：" + total_energy + "平均获取率：" + (total_energy / getTicks()));
+    console.log("屯兵位置：", creepStopPosition);
+    console.log("my spawn id:", spawn.id);
+    console.log("enemy spawn:", enemySpawn);
 }
 
 // 状态：屯兵点待命
@@ -226,11 +244,7 @@ export function statusDefault(enemys: Creep[], dead_my: Creep[], alive_my: Creep
 
 export function loop(): void {
   // Your code goes here
-  console.log("当前Tick:", getTicks());
-  console.log("屯兵位置：", creepStopPosition);
-
-  console.log("my spawn id:", spawn.id);
-  console.log("enemy spawn:", enemySpawn);
+  printInfo()
 
   // 创建爬虫
   createCreeps()
