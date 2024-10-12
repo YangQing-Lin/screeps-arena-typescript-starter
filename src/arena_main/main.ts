@@ -33,15 +33,15 @@ import { findSourceMap } from "module"
 import { futimesSync } from "fs"
 // import {} from "arena"
 
-let max_farmer = 3 // 农民数量
-let max_attacker = 50 // 战士数量
-let max_range_attacker = 0 // 弓箭手数量
-let max_healer = 0 // 牧师数量
+let maxFarmer = 3 // 农民数量
+let maxAtacker = 50 // 战士数量
+let maxRangeAttacker = 0 // 弓箭手数量
+let maxHealer = 0 // 牧师数量
 
-let farmer_list: Creep[] = []
-let attacker_list: Creep[] = []
-let ranger_list: Creep[] = []
-let healer_list: Creep[] = []
+let farmerList: Creep[] = []
+let attackerList: Creep[] = []
+let rangerList: Creep[] = []
+let healerList: Creep[] = []
 
 enum CreepStatus {
     normal="蹲草",
@@ -50,10 +50,10 @@ enum CreepStatus {
     default="默认",
 }
 enum CreateCreepSituation {
-    create_farmer="创建农民",
-    create_attacker="创建近战兵",
-    create_ranger="创建远程兵",
-    create_healer="创建医疗兵",
+    createFarmer="创建农民",
+    createAttacker="创建近战兵",
+    createRanger="创建远程兵",
+    createHealer="创建医疗兵",
     freeze="什么都不做"
 }
 let status = CreepStatus.normal
@@ -86,51 +86,51 @@ export function getOneThirdPosition(fromPos: StructureSpawn, toPos: StructureSpa
 
 // 获取还活着的爬虫
 export function getAliveCreep(creeps: Creep[]) {
-    let alive_creeps = []
+    let aliveCreeps = []
     for (let creep of creeps) {
         if (creep && creep.id && creep.hits) {
-            alive_creeps.push(creep)
+            aliveCreeps.push(creep)
         }
     }
-    return alive_creeps
+    return aliveCreeps
 }
 
 // 获取已经死亡的爬虫
 export function getDeadCreep(creeps: Creep[]) {
-    let dead_creeps = []
+    let deadCreeps = []
     for (let creep of creeps) {
         if (creep && creep.id && !creep.hits) {
-            dead_creeps.push(creep)
+            deadCreeps.push(creep)
         }
     }
-    return dead_creeps
+    return deadCreeps
 }
 
 // 判断当前局势，创建对应的爬虫
 export function judgeCreateCreepSituation(): CreateCreepSituation {
-    let alive_farmers = getObjectsByPrototype(Creep).filter(i => i.my && i.hits)
-    let enemy_screeps = getObjectsByPrototype(Creep).filter(i => !i.my && i.hits)
-    let closest_enemy_to_mySpawn = findClosestByRange(spawn, enemy_screeps)
+    let aliveFarmers = getObjectsByPrototype(Creep).filter(i => i.my && i.hits)
+    let enemyScreeps = getObjectsByPrototype(Creep).filter(i => !i.my && i.hits)
+    let closestEnemyToMyPawn = findClosestByRange(spawn, enemyScreeps)
     // 计算最接近基地敌方单位到基地的距离（直线）
-    let tmp_closest_dis = 1000
-    if (closest_enemy_to_mySpawn) {
-        tmp_closest_dis = getRange(spawn, closest_enemy_to_mySpawn)
+    let tmpClosestDis = 1000
+    if (closestEnemyToMyPawn) {
+        tmpClosestDis = getRange(spawn, closestEnemyToMyPawn)
     }
 
     // 农民没有达到最大值，并且附近没有敌人，就一直造农民
-    if (alive_farmers.length < max_farmer && tmp_closest_dis > 10) return CreateCreepSituation.create_farmer
+    if (aliveFarmers.length < maxFarmer && tmpClosestDis > 10) return CreateCreepSituation.createFarmer
 
-    if (attacker_list.length > 5) {
+    if (attackerList.length > 5) {
         // 计算远程兵和近战兵的分配数量（向下取整）
-        let need_ranger_num: number = Math.ceil(attacker_list.length / 5)
-        let need_healer_num: number = Math.ceil(attacker_list.length / 8)
+        let needRangerNum: number = Math.ceil(attackerList.length / 5)
+        let needHealerNum: number = Math.ceil(attackerList.length / 8)
 
-        if (ranger_list.length < need_ranger_num) return CreateCreepSituation.create_ranger
-        if (healer_list.length < need_healer_num) return CreateCreepSituation.create_healer
+        if (rangerList.length < needRangerNum) return CreateCreepSituation.createRanger
+        if (healerList.length < needHealerNum) return CreateCreepSituation.createHealer
     }
 
 
-    return CreateCreepSituation.create_attacker
+    return CreateCreepSituation.createAttacker
     // return CreateCreepSituation.freeze
 }
 
@@ -138,28 +138,28 @@ export function judgeCreateCreepSituation(): CreateCreepSituation {
 export function createCreeps() {
     let situation = judgeCreateCreepSituation()
     console.log("爬虫创建状态：" + situation);
-    if (situation == CreateCreepSituation.create_farmer) {  // 创建农民
+    if (situation == CreateCreepSituation.createFarmer) {  // 创建农民
         let creep = spawn.spawnCreep([CARRY, CARRY, MOVE, MOVE]).object
         // 创建成功就添加到农民列表中
-        if (creep) farmer_list.push(creep)
+        if (creep) farmerList.push(creep)
 
-    } else if (situation == CreateCreepSituation.create_attacker) {  // 创建近战兵
+    } else if (situation == CreateCreepSituation.createAttacker) {  // 创建近战兵
         let creep = spawn.spawnCreep([
             MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, ATTACK,
         ]).object
-        if (creep) attacker_list.push(creep)
+        if (creep) attackerList.push(creep)
 
-    } else if (situation == CreateCreepSituation.create_ranger) {
+    } else if (situation == CreateCreepSituation.createRanger) {
         let creep = spawn.spawnCreep([
-            MOVE, MOVE, MOVE, MOVE, MOVE, RANGED_ATTACK, RANGED_ATTACK
+            MOVE, MOVE, MOVE, MOVE, MOVE, RANGED_ATTACK
         ]).object
-        if (creep) ranger_list.push(creep)
+        if (creep) rangerList.push(creep)
 
-    } else if (situation == CreateCreepSituation.create_healer) {
+    } else if (situation == CreateCreepSituation.createHealer) {
         let creep = spawn.spawnCreep([
             MOVE, MOVE, MOVE, MOVE, MOVE, HEAL
         ]).object
-        if (creep) healer_list.push(creep)
+        if (creep) healerList.push(creep)
 
     } else {
         return
@@ -168,8 +168,8 @@ export function createCreeps() {
 
 // 搬运能量
 export function carryEnergy(containers: StructureContainer[]) {
-    for (let i = 0; i < farmer_list.length; i++) {
-        let creep = farmer_list[i]
+    for (let i = 0; i < farmerList.length; i++) {
+        let creep = farmerList[i]
         if (!creep.hits) {
             continue
         }
@@ -192,9 +192,9 @@ export function carryEnergy(containers: StructureContainer[]) {
 }
 
 // 状态：屯兵点待命
-export function statusNormal(enemys: Creep[], dead_my: Creep[], alive_my: Creep[]) {
-    for (let i = 0; i < attacker_list.length; i++) {
-        let creep = attacker_list[i]
+export function statusNormal(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+    for (let i = 0; i < attackerList.length; i++) {
+        let creep = attackerList[i]
         if (!creep.hits) {
             continue
         }
@@ -212,16 +212,15 @@ export function statusNormal(enemys: Creep[], dead_my: Creep[], alive_my: Creep[
     }
 
     // 出现减员就切换为全军出击，一波冲烂对面
-    if (dead_my.length > 0) {
+    if (deadMy.length > 0) {
         status = CreepStatus.attack
     }
 }
 
-// 状态：全军出击
-export function statusAttack(enemys: Creep[], dead_my: Creep[], alive_my: Creep[]) {
-    // 近战攻击
-    for (let i = 0; i < attacker_list.length; i++) {
-        let creep = attacker_list[i]
+// 近战兵种的攻击方式
+export function attackerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+    for (let i = 0; i < attackerList.length; i++) {
+        let creep = attackerList[i]
 
         // 已经死亡的爬虫就不要遍历了，会报错
         if (!creep.hits) {
@@ -260,13 +259,34 @@ export function statusAttack(enemys: Creep[], dead_my: Creep[], alive_my: Creep[
     }
 }
 
+// 远程兵种的攻击方式
+export function rangerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+    for (let i = 0; i < rangerList.length; i ++ ) {
+        let creep = rangerList[i]
+
+        if (!creep.hits) continue
+
+        let closeEnemy = findClosestByPath(creep, enemys.filter(t => t.hits))
+        let rangeEnemy = getRange(creep, closeEnemy)
+
+    }
+}
+
+// 治疗兵种的攻击方式
+export function healerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+}
+
+// 状态：全军出击
+export function statusAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+}
+
 // 状态：回防高地
-export function statusBack(enemys: Creep[], dead_my: Creep[], alive_my: Creep[]) {
+export function statusBack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
 
 }
 
 // 状态：默认状态
-export function statusDefault(enemys: Creep[], dead_my: Creep[], alive_my: Creep[]) {
+export function statusDefault(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
 
 }
 
@@ -286,8 +306,8 @@ export function loop(): void {
 
   // 获取敌人信息
   let enemys = getObjectsByPrototype(Creep).filter((i) => !i.my)
-  let dead_my = getDeadCreep(attacker_list)
-  let alive_my = getAliveCreep(attacker_list)
+  let deadMy = getDeadCreep(attackerList)
+  let aliveMy = getAliveCreep(attackerList)
 
   // 等待超过一定时间开始全军出击
   if (getTicks() > 350 && status == CreepStatus.normal) {
@@ -297,18 +317,18 @@ export function loop(): void {
   switch (status) {
       case CreepStatus.normal:
           console.log("屯兵点待命")
-          statusNormal(enemys, dead_my, alive_my)
+          statusNormal(enemys, deadMy, aliveMy)
           break
       case CreepStatus.attack:
           console.log("全军出击")
-          statusAttack(enemys, dead_my, alive_my)
+          statusAttack(enemys, deadMy, aliveMy)
           break
       case CreepStatus.back:
           console.log("回防高地")
-          statusBack(enemys, dead_my, alive_my)
+          statusBack(enemys, deadMy, aliveMy)
           break
       default:
           console.log("默认代码")
-          statusDefault(enemys, dead_my, alive_my)
+          statusDefault(enemys, deadMy, aliveMy)
   }
 }
