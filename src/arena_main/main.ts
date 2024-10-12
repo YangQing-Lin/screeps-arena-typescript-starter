@@ -1,6 +1,7 @@
 import {
   findClosestByPath,
   findClosestByRange,
+  findInRange,
   findPath,
   getObjectById,
   getObjectsByPrototype,
@@ -11,6 +12,7 @@ import {
   Creep,
   GameObject,
   GameObjectConstructor,
+  Position,
   Source,
   StructureContainer,
   StructureSpawn,
@@ -166,6 +168,17 @@ export function createCreeps() {
     }
 }
 
+// 移动远离
+export function moveAway(a: Creep, b:Position) {
+    let path = findPath(a, b)
+    let nextPos = path[0]
+    if (nextPos.x == a.x && nextPos.y == a.y) {
+        console.log("下一步位置一致");  // TODO
+    } else {
+        console.log("下一步位置不一致");
+    }
+}
+
 // 搬运能量
 export function carryEnergy(containers: StructureContainer[]) {
     for (let i = 0; i < farmerList.length; i++) {
@@ -261,13 +274,16 @@ export function attackerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[
 
 // 远程兵种的攻击方式
 export function rangerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+    let aliveEnemys = enemys.filter(t => t.hits)
     for (let i = 0; i < rangerList.length; i ++ ) {
         let creep = rangerList[i]
 
         if (!creep.hits) continue
 
-        let closeEnemy = findClosestByPath(creep, enemys.filter(t => t.hits))
-        let rangeEnemy = getRange(creep, closeEnemy)
+        let hasEnemyInRange = findInRange(creep, aliveEnemys, 3)
+        if (hasEnemyInRange) {
+            let closeEnemy = findClosestByPath(creep, aliveEnemys)
+        }
 
     }
 }
