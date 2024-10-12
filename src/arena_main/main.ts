@@ -19,7 +19,10 @@ import {
   ATTACK,
   CARRY,
   ERR_NOT_IN_RANGE,
+  HEAL_POWER,
   MOVE,
+  RANGED_ATTACK,
+  HEAL,
   RESOURCE_ENERGY,
   RIGHT,
   TOUGH,
@@ -37,8 +40,8 @@ let max_healer = 0 // 牧师数量
 
 let farmer_list: Creep[] = []
 let attacker_list: Creep[] = []
-let range_attacker_list = []
-let healer_list = []
+let ranger_list: Creep[] = []
+let healer_list: Creep[] = []
 
 enum CreepStatus {
     normal="蹲草",
@@ -49,6 +52,8 @@ enum CreepStatus {
 enum CreateCreepSituation {
     create_farmer="创建农民",
     create_attacker="创建近战兵",
+    create_ranger="创建远程兵",
+    create_healer="创建医疗兵",
     freeze="什么都不做"
 }
 let status = CreepStatus.normal
@@ -104,26 +109,60 @@ export function getDeadCreep(creeps: Creep[]) {
 // 判断当前局势，创建对应的爬虫
 export function judgeCreateCreepSituation(): CreateCreepSituation {
     let alive_farmers = getObjectsByPrototype(Creep).filter(i => i.my && i.hits)
-    if (alive_farmers.length < max_farmer) return CreateCreepSituation.create_farmer
-    else return CreateCreepSituation.create_attacker
+    let enemy_screeps = getObjectsByPrototype(Creep).filter(i => !i.my && i.hits)
+    let closest_enemy_to_mySpawn = findClosestByRange(spawn, enemy_screeps)
+    // 计算最接近基地敌方单位到基地的距离（直线）
+    let tmp_closest_dis = 1000
+    if (closest_enemy_to_mySpawn) {
+        tmp_closest_dis = getRange(spawn, closest_enemy_to_mySpawn)
+    }
+
+    // 农民没有达到最大值，并且附近没有敌人，就一直造农民
+    if (alive_farmers.length < max_farmer && tmp_closest_dis > 10) return CreateCreepSituation.create_farmer
+
+    if (attacker_list.length > 5) {
+        // 计算远程兵和近战兵的分配数量（向下取整）
+        let need_ranger_num: number = Math.ceil(attacker_list.length / 5)
+        let need_healer_num: number = Math.ceil(attacker_list.length / 8)
+
+        if (ranger_list.length < need_ranger_num) return CreateCreepSituation.create_ranger
+        if (healer_list.length < need_healer_num) return CreateCreepSituation.create_healer
+    }
+
+
+    return CreateCreepSituation.create_attacker
     // return CreateCreepSituation.freeze
 }
 
 // 创建爬虫
 export function createCreeps() {
     let situation = judgeCreateCreepSituation()
-    if (situation == CreateCreepSituation.create_farmer) {
+    console.log("爬虫创建状态：" + situation);
+    if (situation == CreateCreepSituation.create_farmer) {  // 创建农民
         let creep = spawn.spawnCreep([CARRY, CARRY, MOVE, MOVE]).object
-        if (creep) {
-            farmer_list.push(creep)
-        }
-    } else if (situation == CreateCreepSituation.create_attacker) {
+        // 创建成功就添加到农民列表中
+        if (creep) farmer_list.push(creep)
+
+    } else if (situation == CreateCreepSituation.create_attacker) {  // 创建近战兵
         let creep = spawn.spawnCreep([
             MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, ATTACK,
         ]).object
-        if (creep) {
-            attacker_list.push(creep)
-        }
+        if (creep) attacker_list.push(creep)
+
+    } else if (situation == CreateCreepSituation.create_ranger) {
+        let creep = spawn.spawnCreep([
+            MOVE, MOVE, MOVE, MOVE, MOVE, RANGED_ATTACK, RANGED_ATTACK
+        ]).object
+        if (creep) ranger_list.push(creep)
+
+    } else if (situation == CreateCreepSituation.create_healer) {
+        let creep = spawn.spawnCreep([
+            MOVE, MOVE, MOVE, MOVE, MOVE, HEAL
+        ]).object
+        if (creep) healer_list.push(creep)
+
+    } else {
+        return
     }
 }
 
