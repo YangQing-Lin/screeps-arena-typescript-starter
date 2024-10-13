@@ -28,14 +28,17 @@ import {
     RESOURCE_ENERGY,
     RIGHT,
     TOUGH,
-    WORK
+    WORK,
+    BOTTOM,
+    BodyPartConstant
 } from "game/constants";
 import { CLIENT_RENEG_LIMIT } from "tls";
 import { findSourceMap } from "module";
-import { futimesSync, stat } from "fs";
+import { close, futimesSync, stat } from "fs";
 import { FindPosition, Position } from "source-map";
 import { errorMonitor } from "events";
-// import {} from "arena"
+import { BodyPart } from "arena";
+import { moveMessagePortToContext } from "worker_threads";
 
 let maxFarmer = 3; // 农民数量
 let maxAtacker = 50; // 战士数量
@@ -123,16 +126,21 @@ export function judgeCreateCreepSituation(): CreateCreepSituation {
     // 农民没有达到最大值，并且附近没有敌人，就一直造农民
     if (aliveFarmers.length < maxFarmer && tmpClosestDis > 10) return CreateCreepSituation.createFarmer;
 
-    if (attackerList.length > 5) {
-        // 计算远程兵和近战兵的分配数量（向下取整）
-        let needRangerNum: number = Math.ceil(attackerList.length / 5);
-        let needHealerNum: number = Math.ceil(attackerList.length / 8);
-
-        if (rangerList.length < needRangerNum) return CreateCreepSituation.createRanger;
-        if (healerList.length < needHealerNum) return CreateCreepSituation.createHealer;
+    let needHealerNum = rangerList.length / 2;
+    if (needHealerNum < healerList.length) {
+        return CreateCreepSituation.createHealer;
     }
 
-    return CreateCreepSituation.createRanger; // TODO 测试代码
+    // if (attackerList.length > 5) {
+    //     // 计算远程兵和近战兵的分配数量（向下取整）
+    //     let needRangerNum: number = Math.ceil(attackerList.length / 5);
+    //     let needHealerNum: number = Math.ceil(attackerList.length / 8);
+
+    //     if (rangerList.length < needRangerNum) return CreateCreepSituation.createRanger;
+    //     if (healerList.length < needHealerNum) return CreateCreepSituation.createHealer;
+    // }
+
+    return CreateCreepSituation.createRanger; // 默认生成远程兵
     // return CreateCreepSituation.freeze
 }
 
@@ -150,7 +158,20 @@ export function createCreeps() {
         let creep = spawn.spawnCreep([MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, ATTACK]).object;
         if (creep) attackerList.push(creep);
     } else if (situation == CreateCreepSituation.createRanger) {
-        let creep = spawn.spawnCreep([MOVE, MOVE, MOVE, MOVE, MOVE, RANGED_ATTACK]).object;
+        let creep = spawn.spawnCreep([
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            MOVE,
+            RANGED_ATTACK,
+            RANGED_ATTACK
+        ]).object;
         if (creep) rangerList.push(creep);
     } else if (situation == CreateCreepSituation.createHealer) {
         let creep = spawn.spawnCreep([MOVE, MOVE, MOVE, MOVE, MOVE, HEAL]).object;
@@ -169,7 +190,7 @@ export function moveAway(a: Creep, b: RoomPosition) {
     let stepY = nextPos.y - a.y;
     // 用当前位置减去上面的变化量，就能得到反方向的下一步
     let awayPos = <RoomPosition>{ x: a.x - stepX, y: a.y - stepY };
-    a.moveTo(awayPos)
+    a.moveTo(awayPos);
 }
 
 // 搬运能量
@@ -270,32 +291,113 @@ export function rangerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[])
         let inRangeEnemys = findInRange(creep, aliveEnemys, 3);
         let closedEnemy = findClosestByPath(creep, aliveEnemys);
         if (inRangeEnemys.length > 0) {
-            let targetEnemy = inRangeEnemys[0]
+            let targetEnemy = inRangeEnemys[0];
             if (getRange(creep, targetEnemy) < 3) moveAway(creep, closedEnemy);
-            let back = creep.rangedAttack(targetEnemy)
+            let back = creep.rangedAttack(targetEnemy);
             // console.log("移动后攻击敌人效果：" + back);
         } else if (closedEnemy) {
-            let back = creep.rangedAttack(closedEnemy)
+            let back = creep.rangedAttack(closedEnemy);
             if (back == ERR_NOT_IN_RANGE) {
-                let tmp = creep.moveTo(closedEnemy)
+                let tmp = creep.moveTo(closedEnemy);
                 // console.log("移动返回值：" + tmp);
             }
         } else {
             if (creep.rangedAttack(enemySpawn) == ERR_NOT_IN_RANGE) {
-                creep.moveTo(enemySpawn)
+                creep.moveTo(enemySpawn);
             }
         }
     }
 }
 
-// 治疗兵种的攻击方式
-export function healerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {}
+// 治疗兵种的治疗方式
+export function healerHeal(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
+    let aliveEnemys = enemys.filter(t => t.hits);
+    for (let i = 0; i < healerList.length; i++) {
+        /**
+         * 如果周围3格内有敌人
+         * - 自身受到的伤害超过 12*2 就往远处移动，治疗自己
+         * - 没有超过12*2，但是超过12*1，贴近最近的残血队友，治疗自己
+         * - 没有超过12*1，贴近最近的残血队友，治疗队友
+         *
+         * 周围3格内没有敌人
+         * - 受到的伤害超过 12*1 朝血量比例最低的队友移动，治疗自己
+         * - 朝血量比例最低的队友移动，治疗队友
+         */
+        let creep = healerList[i];
+        let otherMy = aliveMy.filter(t => t != creep)
+        let closedEnemy = findClosestByRange(creep, enemys)
+        let minEnemyDis = getRange(creep, closedEnemy)
+        let woundMyCreeps = otherMy.filter(t => t.hits < t.hitsMax)
+        // 最近的受伤单位默认是自己
+        let closedWoundMy = creep
+        // 如果有其他的友方受伤单位，那么就优先治疗最近的
+        if (woundMyCreeps.length > 0) {
+            closedWoundMy = findClosestByPath(creep, woundMyCreeps)
+        }
+
+        let damage = creep.hitsMax - creep.hits
+        if (minEnemyDis <= 3) {
+            if (damage >= 12 * 2) {
+                moveAway(creep, closedEnemy)
+                let back = creep.heal(creep)
+                console.log(creep.id, "治疗自己结果：" + back);
+            } else if (damage >= 12 * 1) {
+                if (getRange(creep, closedWoundMy) >= 2) {
+                    creep.moveTo(closedWoundMy)
+                }
+                let back = creep.heal(creep)
+            } else {
+                if (getRange(creep, closedWoundMy) >= 2) {
+                    creep.moveTo(closedWoundMy)
+                }
+                let back = creep.heal(closedWoundMy)
+            }
+        } else {
+            if (damage >= 12 * 1) {
+                if (getRange(creep, closedWoundMy) >= 2) {
+                    creep.moveTo(closedWoundMy)
+                }
+                let back = creep.heal(creep)
+            } else {
+                if (getRange(creep, closedWoundMy) >= 2) {
+                    creep.moveTo(closedWoundMy)
+                }
+                let back = creep.heal(closedWoundMy)
+            }
+        }
+
+
+        // 判断当前的局势，执行移动操作（自保第一，自保的同时尽量接近友方残血单位）
+        // let rangeShort = findInRange(creep, aliveEnemys, 1); // 身边的敌人
+        // let rangeDistance = []; // 远距离的敌人（只考虑敌人的远程兵）
+        // for (let enemy of enemys) {
+        //     if (enemy.body.filter(t => t.type == RANGED_ATTACK && t.hits > 0).length > 0) {
+        //         rangeDistance.push(enemy)
+        //     }
+        // }
+
+
+        // 优先治疗自己（治疗自己一次能恢复12hits，所以判断一下当前血量来提升治疗效率）
+        if (damage >= 12 * 1) {
+            let back = creep.heal(creep)
+        }
+        // 查询可治疗范围内的所有友方单位，如果找到血量最低的那个进行治疗
+        else {
+            if (creep.heal(closedWoundMy) == ERR_NOT_IN_RANGE) {
+                creep.moveTo(closedWoundMy)
+            }
+        }
+
+        // 默认治疗自己
+        creep.heal(creep)
+    }
+}
 
 // 状态：全军出击
 export function statusAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
     attackerAttack(enemys, deadMy, aliveMy);
     rangerAttack(enemys, deadMy, aliveMy);
-    healerAttack(enemys, deadMy, aliveMy);
+    healerHeal(enemys, deadMy, aliveMy);
 }
 
 // 状态：回防高地
@@ -320,8 +422,8 @@ export function loop(): void {
 
     // 获取敌人信息
     let enemys = getObjectsByPrototype(Creep).filter(i => !i.my && i.hits);
-    let deadMy = getDeadCreep(attackerList);
-    let aliveMy = getAliveCreep(attackerList);
+    let deadMy = getObjectsByPrototype(Creep).filter(i => i.my && !i.hits);
+    let aliveMy = getObjectsByPrototype(Creep).filter(i => i.my && i.hits);
 
     // 等待超过一定时间开始全军出击
     if (getTicks() > 350 && status == CreepStatus.normal) {
