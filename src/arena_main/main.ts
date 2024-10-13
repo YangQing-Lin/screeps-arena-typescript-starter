@@ -33,7 +33,8 @@ import {
 import { CLIENT_RENEG_LIMIT } from "tls";
 import { findSourceMap } from "module";
 import { futimesSync, stat } from "fs";
-import { Position } from "source-map";
+import { FindPosition, Position } from "source-map";
+import { errorMonitor } from "events";
 // import {} from "arena"
 
 let maxFarmer = 3; // 农民数量
@@ -161,13 +162,14 @@ export function createCreeps() {
 
 // 移动远离
 export function moveAway(a: Creep, b: RoomPosition) {
-    let path = findPath(a, b);
-    let nextPos = path[0];
-    if (nextPos.x == a.x && nextPos.y == a.y) {
-        console.log("下一步位置一致"); // TODO 明天继续
-    } else {
-        console.log("下一步位置不一致");
-    }
+    // 注意：findPath 获取到的路径的第0项，是Creep当前位置的下一个点位
+    let nextPos = findPath(a, b)[0];
+    // 计算移动到下一步x和y的变化量
+    let stepX = nextPos.x - a.x;
+    let stepY = nextPos.y - a.y;
+    // 用当前位置减去上面的变化量，就能得到反方向的下一步
+    let awayPos = <RoomPosition>{ x: a.x - stepX, y: a.y - stepY };
+    a.moveTo(awayPos)
 }
 
 // 搬运能量
@@ -248,7 +250,6 @@ export function attackerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[
                 creep.moveTo(closeEnemy);
             }
         } else {
-            console.log(creep.id, creep.attack(enemySpawn));
             if (creep.attack(enemySpawn) == ERR_NOT_IN_RANGE) {
                 creep.moveTo(enemySpawn);
             }
@@ -258,21 +259,30 @@ export function attackerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[
 
 // 远程兵种的攻击方式
 export function rangerAttack(enemys: Creep[], deadMy: Creep[], aliveMy: Creep[]) {
-    let aliveEnemys = enemys.filter(t => t.hits);
+    let aliveEnemys: Creep[] = enemys.filter(t => t.hits);
     let aliveRangerList = rangerList.filter(i => i.hits);
     for (let i = 0; i < aliveRangerList.length; i++) {
         let creep = aliveRangerList[i];
 
         if (!creep.hits) continue;
 
-        let hasEnemyInRange = findInRange(creep, aliveEnemys, 3);
+        // console.log("存活的敌人数量：" + aliveEnemys.length);
+        let inRangeEnemys = findInRange(creep, aliveEnemys, 3);
         let closedEnemy = findClosestByPath(creep, aliveEnemys);
-        console.log("最近的敌人：" + closedEnemy);
-        if (hasEnemyInRange) {
-            moveAway(creep, closedEnemy);
+        if (inRangeEnemys.length > 0) {
+            let targetEnemy = inRangeEnemys[0]
+            if (getRange(creep, targetEnemy) < 3) moveAway(creep, closedEnemy);
+            let back = creep.rangedAttack(targetEnemy)
+            // console.log("移动后攻击敌人效果：" + back);
         } else if (closedEnemy) {
-            if (creep.rangedAttack(closedEnemy) == ERR_NOT_IN_RANGE) {
-                creep.moveTo(closedEnemy);
+            let back = creep.rangedAttack(closedEnemy)
+            if (back == ERR_NOT_IN_RANGE) {
+                let tmp = creep.moveTo(closedEnemy)
+                // console.log("移动返回值：" + tmp);
+            }
+        } else {
+            if (creep.rangedAttack(enemySpawn) == ERR_NOT_IN_RANGE) {
+                creep.moveTo(enemySpawn)
             }
         }
     }
@@ -321,7 +331,8 @@ export function loop(): void {
     switch (status) {
         case CreepStatus.normal:
             console.log("屯兵点待命");
-            statusNormal(enemys, deadMy, aliveMy);
+            // statusNormal(enemys, deadMy, aliveMy);
+            statusAttack(enemys, deadMy, aliveMy); // TODO test code
             break;
         case CreepStatus.attack:
             console.log("全军出击");
